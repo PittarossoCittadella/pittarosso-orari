@@ -735,7 +735,7 @@ let S={
   }
 };
 let editId=null,pickedColor=PALETTE_8[0],ctxTarget=null,nextId=10;
-let ctxPending=null,pendingBackupData=null;
+let ctxPending=null,pendingBackupData=null,manualVal=null;
 let oreAssenzaPending=null; // {d, eid, val}
 let setupPickedColor=PALETTE_8[0];
 let setupEmployees=[];
@@ -1233,7 +1233,12 @@ function renderMob(){
 // ══════════════════════════════════════════
 function toggleSlot(d,eid,si){
   const sch=getSched();
-  sch[d][eid][si]=sch[d][eid][si]==='work'?'':'work';
+  if(manualVal){
+    // Modalità manuale — imposta il valore scelto (F/M/P/R) o rimuovi se già presente
+    sch[d][eid][si]=sch[d][eid][si]===manualVal?'':manualVal;
+  } else {
+    sch[d][eid][si]=sch[d][eid][si]==='work'?'':'work';
+  }
   saveToStorage();renderGrid();renderEmpBar();renderStats();renderRiepilogo();
   if(isMob())renderMob();
 }
@@ -1254,6 +1259,10 @@ document.getElementById('ctxMenu').addEventListener('click',function(ev){
   const{d,eid,si}=ctxPending;
   closeCtx();
   if(val==='work'||val===''){
+    // Disattiva modalità manuale se attiva
+    manualVal=null;
+    const banner=document.getElementById('manualBanner');
+    if(banner)banner.style.display='none';
     getSched()[d][eid][si]=val;
     saveToStorage();renderGrid();renderEmpBar();renderStats();renderRiepilogo();if(isMob())renderMob();
   } else {
@@ -1299,8 +1308,26 @@ document.getElementById('btnOreApplica').addEventListener('click',()=>{
 });
 
 document.getElementById('btnOreManuale').addEventListener('click',()=>{
+  const val=oreAssenzaPending.val;
   document.getElementById('oreAssenzaOverlay').classList.remove('show');
-  // L'utente inserirà manualmente slot per slot
+  // Attiva modalità manuale — i click sulle celle useranno questo valore
+  manualVal=val;
+  const labels={F:'Ferie',M:'Malattia',P:'Permesso',R:'ROL'};
+  const colors={F:'#CC0000',M:'#e74c3c',P:'#27AE60',R:'#7D3C98'};
+  // Mostra banner in cima alla griglia
+  let banner=document.getElementById('manualBanner');
+  if(!banner){
+    banner=document.createElement('div');
+    banner.id='manualBanner';
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999;padding:8px 16px;text-align:center;font-weight:700;font-size:13px;cursor:pointer;';
+    banner.title='Clicca qui per uscire dalla modalità manuale';
+    document.body.appendChild(banner);
+  }
+  banner.style.background=colors[val]||'#888';
+  banner.style.color='#fff';
+  banner.textContent=`✏️ Modalità ${labels[val]||val} attiva — clicca le celle.   ✕ Clicca qui o scegli "Turno di lavoro" per terminare`;
+  banner.style.display='block';
+  banner.onclick=()=>{manualVal=null;banner.style.display='none';};
 });
 
 function renderRiepilogo(){
