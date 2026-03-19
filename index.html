@@ -720,6 +720,8 @@ let S={
   weekStart:getMonday(new Date()),
   day:0,
   budget:130,
+  defaultBudget:130,
+  weekBudgets:{},
   storeName:'',
   employees:[],
   sched:{},
@@ -861,11 +863,16 @@ function distribuisciOre(d,eid,val,ore){
 // ══════════════════════════════════════════
 // LOCALSTORAGE
 // ══════════════════════════════════════════
+function weekKey(d){return getMonday(d).toISOString().slice(0,10);}
+function getBudget(){const k=weekKey(S.weekStart);return S.weekBudgets[k]!==undefined?S.weekBudgets[k]:S.defaultBudget;}
+function setBudget(v){const k=weekKey(S.weekStart);S.weekBudgets[k]=v;S.budget=v;}
+
 function saveToStorage(){
   try{
     const toSave={
       sched:S.sched,notes:S.notes,employees:S.employees,
-      budget:S.budget,nextId,storeName:S.storeName,config:S.config,
+      budget:S.budget,defaultBudget:S.defaultBudget,weekBudgets:S.weekBudgets,
+      nextId,storeName:S.storeName,config:S.config,
       weekStart:S.weekStart.toISOString()
     };
     localStorage.setItem('pittarosso_state',JSON.stringify(toSave));
@@ -879,11 +886,15 @@ function loadFromStorage(){
     if(saved.sched)S.sched=saved.sched;
     if(saved.notes)S.notes=saved.notes;
     if(saved.employees&&saved.employees.length)S.employees=saved.employees;
+    if(saved.defaultBudget)S.defaultBudget=saved.defaultBudget;
+    if(saved.weekBudgets)S.weekBudgets=saved.weekBudgets;
     if(saved.budget)S.budget=saved.budget;
     if(saved.storeName)S.storeName=saved.storeName;
     if(saved.config)S.config={...S.config,...saved.config};
     if(saved.nextId)nextId=saved.nextId;
     if(saved.weekStart)S.weekStart=getMonday(new Date(saved.weekStart));
+    // Carica budget della settimana corrente
+    S.budget=getBudget();
     return true;
   }catch(e){return false;}
 }
@@ -1554,10 +1565,12 @@ document.getElementById('riepilogoToggle').addEventListener('click',()=>{
 });
 // ══════════════════════════════════════════
 document.getElementById('prevWeek').addEventListener('click',()=>{
-  S.weekStart=new Date(S.weekStart);S.weekStart.setDate(S.weekStart.getDate()-7);getSched();render();saveToStorage();
+  S.weekStart=new Date(S.weekStart);S.weekStart.setDate(S.weekStart.getDate()-7);
+  S.budget=getBudget();getSched();render();saveToStorage();
 });
 document.getElementById('nextWeek').addEventListener('click',()=>{
-  S.weekStart=new Date(S.weekStart);S.weekStart.setDate(S.weekStart.getDate()+7);getSched();render();saveToStorage();
+  S.weekStart=new Date(S.weekStart);S.weekStart.setDate(S.weekStart.getDate()+7);
+  S.budget=getBudget();getSched();render();saveToStorage();
 });
 
 // ══════════════════════════════════════════
@@ -1654,9 +1667,11 @@ document.getElementById('empOverlay').addEventListener('click',ev=>{if(ev.target
 // MODAL BUDGET
 // ══════════════════════════════════════════
 function openBudgetModal(){
+  S.budget=getBudget();
   document.getElementById('bBudget').value=S.budget;
   const list=document.getElementById('bEmpList');
-  list.innerHTML='<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;font-weight:600">Ore Contrattuali Dipendenti</div>';
+  list.innerHTML=`<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Budget standard negozio: <b>${S.defaultBudget}h</b> — modifichi solo questa settimana</div>
+  <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;font-weight:600">Ore Contrattuali Dipendenti</div>`;
   S.employees.forEach(e=>{
     const row=document.createElement('div');row.className='f-group';row.style.marginBottom='8px';
     row.innerHTML=`<label style="display:flex;align-items:center;gap:6px">
@@ -1669,7 +1684,9 @@ function openBudgetModal(){
 }
 function saveBudgetModal(){
   const bv=parseInt(document.getElementById('bBudget').value);
-  if(!isNaN(bv)&&bv>0)S.budget=bv;
+  if(!isNaN(bv)&&bv>0){
+    setBudget(bv); // salva per questa settimana
+  }
   document.getElementById('bEmpList').querySelectorAll('input[data-eid]').forEach(inp=>{
     const eid=+inp.dataset.eid,v=parseInt(inp.value);
     const emp=S.employees.find(e=>e.id===eid);
